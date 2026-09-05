@@ -1,0 +1,21 @@
+{
+  "rules": [
+    {
+      "extensions": [
+        "mcworld",
+        "mcaddon",
+        "mcpack"
+      ],
+      "destination": "Minecraft"
+    },
+    {
+      "extensions": [
+        "apk",
+        "apks",
+        "xapk"
+      ],
+      "destination": "APKS"
+    }
+  ],
+  "default": "Other"
+}
