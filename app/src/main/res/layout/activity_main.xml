@@ -5,21 +5,38 @@
     android:padding="20dp">
 
     <TextView
-        android:id="@+id/title"
         android:text="Termux Sorter"
         android:textSize="24sp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <TextView
+            android:id="@+id/rulesView"
+            android:text="Načítám pravidla..."
+            android:textSize="18sp"
+            android:padding="10dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+    </ScrollView>
+
+
     <Button
         android:id="@+id/addRule"
-        android:text="Přidat pravidlo"
+        android:text="PŘIDAT PRAVIDLO"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
+
     <Button
         android:id="@+id/save"
-        android:text="Uložit konfiguraci"
+        android:text="ULOŽIT KONFIGURACI"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
