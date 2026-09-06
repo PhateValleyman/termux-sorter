@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -25,6 +26,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class MainActivity extends Activity {
 
@@ -39,7 +42,7 @@ public class MainActivity extends Activity {
     private Config.RuleSet ruleSet;
     private TextView defaultDestinationView;
     private ListView rulesListView;
-    private RuleAdapter adapter;
+    private GroupedRuleAdapter adapter;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -51,11 +54,12 @@ public class MainActivity extends Activity {
 
         ruleSet = Config.load(this);
 
-        adapter = new RuleAdapter(ruleSet.rules);
+        adapter = new GroupedRuleAdapter();
         rulesListView.setAdapter(adapter);
-        rulesListView.setOnItemClickListener((parent, view, position, id) ->
-            showRuleDialog(ruleSet.rules.get(position))
-        );
+        rulesListView.setOnItemClickListener((parent, view, position, id) -> {
+            Config.Rule rule = adapter.getRuleAt(position);
+            if (rule != null) showRuleDialog(rule);
+        });
 
         refreshRulesView();
 
@@ -72,31 +76,150 @@ public class MainActivity extends Activity {
 
     private void refreshRulesView() {
         defaultDestinationView.setText("Výchozí složka (bez shody): " + ruleSet.defaultDestination);
-        adapter.notifyDataSetChanged();
+        adapter.rebuild();
     }
 
     // ---------------------------------------------------------------
     // Seznam pravidel
     // ---------------------------------------------------------------
 
-    private class RuleAdapter extends ArrayAdapter<Config.Rule> {
-        RuleAdapter(List<Config.Rule> rules) {
-            super(MainActivity.this, 0, rules);
+    private static final int VIEW_TYPE_HEADER = 0;
+    private static final int VIEW_TYPE_RULE = 1;
+
+    /** Jedna položka v zobrazovaném (seskupeném) seznamu. */
+    private static class ListEntry {
+        final boolean isHeader;
+        final String headerText;
+        final Config.Rule rule;
+
+        static ListEntry header(String text) {
+            return new ListEntry(true, text, null);
+        }
+
+        static ListEntry item(Config.Rule rule) {
+            return new ListEntry(false, null, rule);
+        }
+
+        private ListEntry(boolean isHeader, String headerText, Config.Rule rule) {
+            this.isHeader = isHeader;
+            this.headerText = headerText;
+            this.rule = rule;
+        }
+    }
+
+    /**
+     * Zobrazuje pravidla seskupená podle cílové složky - všechna pravidla se
+     * stejným "destination" jsou pohromadě pod jedním záhlavím se jménem
+     * složky, seřazeným abecedně.
+     */
+    private class GroupedRuleAdapter extends BaseAdapter {
+
+        private List<ListEntry> entries = new ArrayList<>();
+
+        GroupedRuleAdapter() {
+            rebuild();
+        }
+
+        void rebuild() {
+            entries = new ArrayList<>();
+
+            // TreeMap se zachová i vkládací pořadí uvnitř skupiny (ArrayList),
+            // jen skupiny samotné seřadí abecedně podle jména složky.
+            Map<String, List<Config.Rule>> grouped = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+
+            for (Config.Rule rule : ruleSet.rules) {
+                List<Config.Rule> bucket = grouped.get(rule.destination);
+                if (bucket == null) {
+                    bucket = new ArrayList<>();
+                    grouped.put(rule.destination, bucket);
+                }
+                bucket.add(rule);
+            }
+
+            for (Map.Entry<String, List<Config.Rule>> group : grouped.entrySet()) {
+                String folder = group.getKey();
+                List<Config.Rule> rules = group.getValue();
+
+                String headerText = rules.size() > 1
+                    ? folder + "  (" + rules.size() + " pravidla)"
+                    : folder;
+
+                entries.add(ListEntry.header(headerText));
+                for (Config.Rule rule : rules) {
+                    entries.add(ListEntry.item(rule));
+                }
+            }
+
+            notifyDataSetChanged();
+        }
+
+        /** Pravidlo na dané pozici, nebo null pokud je to záhlaví. */
+        Config.Rule getRuleAt(int position) {
+            ListEntry entry = entries.get(position);
+            return entry.isHeader ? null : entry.rule;
+        }
+
+        @Override
+        public int getCount() {
+            return entries.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return entries.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public int getViewTypeCount() {
+            return 2;
+        }
+
+        @Override
+        public int getItemViewType(int position) {
+            return entries.get(position).isHeader ? VIEW_TYPE_HEADER : VIEW_TYPE_RULE;
+        }
+
+        @Override
+        public boolean isEnabled(int position) {
+            // Záhlaví skupiny nejsou klikatelná.
+            return !entries.get(position).isHeader;
+        }
+
+        @Override
+        public boolean areAllItemsEnabled() {
+            return false;
         }
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
+            ListEntry entry = entries.get(position);
+
+            if (entry.isHeader) {
+                TextView headerView = (TextView) convertView;
+                if (headerView == null) {
+                    headerView = (TextView) LayoutInflater.from(MainActivity.this)
+                        .inflate(R.layout.list_header_folder, parent, false);
+                }
+                headerView.setText(entry.headerText);
+                return headerView;
+            }
+
             if (convertView == null) {
-                convertView = LayoutInflater.from(getContext())
+                convertView = LayoutInflater.from(MainActivity.this)
                     .inflate(R.layout.list_item_rule, parent, false);
             }
 
-            Config.Rule rule = getItem(position);
+            Config.Rule rule = entry.rule;
 
             TextView title = convertView.findViewById(R.id.ruleTitle);
             TextView subtitle = convertView.findViewById(R.id.ruleSubtitle);
 
-            title.setText(TextUtils.join(", ", rule.extensions) + "  →  " + rule.destination);
+            title.setText(TextUtils.join(", ", rule.extensions));
             subtitle.setText(describeAction(rule));
 
             return convertView;

@@ -1,10 +1,10 @@
-# Termux Sorter
+# File Sorter
 
 Automatické třídění souborů pomocí Android Share/Open-With intentů ("Otevřít v...").
 
 ## Jak to funguje
 
-1. V libovolné aplikaci zvol soubor → Sdílet / Otevřít v... → **Termux Sorter**.
+1. V libovolné aplikaci zvol soubor → Sdílet / Otevřít v... → **File Sorter**.
 2. Aplikace podle přípony souboru najde odpovídající pravidlo (viz níže) a
    soubor přesune do `Download/<cílová složka>/`.
 3. Podle pravidla se pak spustí jedna z akcí:
