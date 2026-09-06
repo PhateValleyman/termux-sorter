@@ -66,7 +66,7 @@ public class ActionRunner {
             );
 
 
-            try { context.startService(intent); } catch (Exception e) { e.printStackTrace(); }
+            context.startService(intent);
 
         }
 
