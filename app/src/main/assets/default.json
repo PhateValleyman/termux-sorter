@@ -1,0 +1,27 @@
+{
+ "rules":[
+  {
+   "name":"Minecraft",
+   "extensions":[
+    "mcworld",
+    "mcaddon",
+    "mcpack"
+   ],
+   "destination":"Minecraft",
+   "actionType":"APP",
+   "actionValue":"com.mojang.minecraftpe"
+  },
+
+  {
+   "name":"Scripts",
+   "extensions":[
+    "sh"
+   ],
+   "destination":"scripts",
+   "actionType":"TERMUX_RUN",
+   "actionValue":"/data/data/com.termux/files/home/bin/editor.sh"
+  }
+ ],
+
+ "default":"Other"
+}
