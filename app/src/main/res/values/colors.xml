@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Termux-inspired dark theme accent color -->
+    <color name="colorAccent">#129303</color>
+    <color name="colorPrimary">#129303</color>
+    <color name="colorPrimaryDark">#0B5C02</color>
+    <color name="colorBackground">#121212</color>
+    <color name="colorSurface">#1E1E1E</color>
+    <color name="colorTextPrimary">#FFFFFF</color>
+    <color name="colorTextSecondary">#B0B0B0</color>
+    <color name="ic_launcher_background">#121212</color>
 </resources>
