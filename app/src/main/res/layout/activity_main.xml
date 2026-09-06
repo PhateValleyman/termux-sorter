@@ -10,29 +10,27 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
+    <TextView
+        android:id="@+id/defaultDestinationView"
+        android:textSize="14sp"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 
-    <ScrollView
+    <ListView
+        android:id="@+id/rulesListView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <TextView
-            android:id="@+id/rulesView"
-            android:text="Načítám pravidla..."
-            android:textSize="18sp"
-            android:padding="10dp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-
-    </ScrollView>
-
+        android:layout_weight="1"
+        android:divider="#33000000"
+        android:dividerHeight="1dp"/>
 
     <Button
         android:id="@+id/addRule"
         android:text="PŘIDAT PRAVIDLO"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
-
 
     <Button
         android:id="@+id/save"

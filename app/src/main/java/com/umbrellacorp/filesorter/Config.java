@@ -120,7 +120,7 @@ public class Config {
         StringBuilder sb = new StringBuilder();
 
         for (Rule rule : ruleSet.rules) {
-            sb.append(String.join(", ", rule.extensions))
+            sb.append(android.text.TextUtils.join(", ", rule.extensions))
               .append(" → ")
               .append(rule.destination);
 
