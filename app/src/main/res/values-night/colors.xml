@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#121212</color>
+    <color name="background_dark">#121212</color>
+    <color name="background_surface">#1E1E1E</color>
+    <color name="termux_green">#129303</color>
+    <color name="termux_green_dark">#0B5C02</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#BDBDBD</color>
+</resources>
