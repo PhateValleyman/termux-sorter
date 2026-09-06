@@ -10,11 +10,11 @@ if (hasKeystore) {
 }
 
 android {
-    namespace "com.umbrellacorp.termuxsorter"
+    namespace "com.umbrellacorp.filesorter"
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.umbrellacorp.termuxsorter"
+        applicationId "com.umbrellacorp.filesorter"
         minSdk 23
         targetSdk 35
         versionCode 1

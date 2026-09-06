@@ -1,4 +1,4 @@
-package com.umbrellacorp.termuxsorter;
+package com.umbrellacorp.filesorter;
 
 import android.content.Context;
 import android.content.Intent;

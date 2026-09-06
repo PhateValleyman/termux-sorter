@@ -1,4 +1,4 @@
-package com.umbrellacorp.termuxsorter;
+package com.umbrellacorp.filesorter;
 
 import android.content.Context;
 import android.util.Log;
@@ -24,7 +24,7 @@ import java.util.Scanner;
  */
 public class Config {
 
-    private static final String TAG = "TermuxSorterConfig";
+    private static final String TAG = "FileSorterConfig";
     private static final String CONFIG_FILE = "rules.json";
 
     public static class Rule {

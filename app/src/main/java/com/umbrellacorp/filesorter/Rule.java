@@ -1,4 +1,4 @@
-package com.umbrellacorp.termuxsorter;
+package com.umbrellacorp.filesorter;
 
 import java.util.List;
 

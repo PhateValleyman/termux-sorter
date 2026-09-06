@@ -1,4 +1,4 @@
-package com.umbrellacorp.termuxsorter;
+package com.umbrellacorp.filesorter;
 
 import android.Manifest;
 import android.app.Activity;
@@ -29,14 +29,14 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Handles "Otevřít v... → Termux Sorter" (ACTION_SEND / ACTION_SEND_MULTIPLE / ACTION_VIEW).
+ * Handles "Otevřít v... → File Sorter" (ACTION_SEND / ACTION_SEND_MULTIPLE / ACTION_VIEW).
  *
  * Sorts each incoming file into Downloads/<destination>/<filename> based on
  * the rules from {@link Config}, matched by file extension.
  */
 public class SortActivity extends Activity {
 
-    private static final String TAG = "TermuxSorterActivity";
+    private static final String TAG = "FileSorterActivity";
     private static final int REQUEST_WRITE_STORAGE = 1001;
 
     @Override
