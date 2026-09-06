@@ -27,13 +27,28 @@ public class Config {
     private static final String TAG = "FileSorterConfig";
     private static final String CONFIG_FILE = "rules.json";
 
+    /**
+     * A single sorting rule. actionType/actionValue are optional:
+     *   null          -> default: open a Termux session cd'd into the destination folder
+     *   "APP"         -> actionValue is a package name to launch after sorting
+     *   "TERMUX_RUN"  -> actionValue is a script/executable path run against the sorted file
+     *   "NONE"        -> do nothing extra after sorting
+     */
     public static class Rule {
         public final List<String> extensions;
         public final String destination;
+        public final String actionType;
+        public final String actionValue;
 
         public Rule(List<String> extensions, String destination) {
+            this(extensions, destination, null, null);
+        }
+
+        public Rule(List<String> extensions, String destination, String actionType, String actionValue) {
             this.extensions = extensions;
             this.destination = destination;
+            this.actionType = actionType;
+            this.actionValue = actionValue;
         }
     }
 
@@ -80,6 +95,10 @@ public class Config {
                 JSONObject ruleObj = new JSONObject();
                 ruleObj.put("extensions", new JSONArray(rule.extensions));
                 ruleObj.put("destination", rule.destination);
+                // putOpt: skip the key entirely when actionType/actionValue is null,
+                // instead of writing the string "null".
+                ruleObj.putOpt("actionType", rule.actionType);
+                ruleObj.putOpt("actionValue", rule.actionValue);
                 rulesArray.put(ruleObj);
             }
 
@@ -103,8 +122,12 @@ public class Config {
         for (Rule rule : ruleSet.rules) {
             sb.append(String.join(", ", rule.extensions))
               .append(" → ")
-              .append(rule.destination)
-              .append("\n");
+              .append(rule.destination);
+
+            if (rule.actionType != null) {
+                sb.append("  [").append(rule.actionType).append("]");
+            }
+            sb.append("\n");
         }
 
         sb.append("(výchozí) → ").append(ruleSet.defaultDestination);
@@ -151,7 +174,15 @@ public class Config {
                     extensions.add(extArray.getString(j));
                 }
 
-                rules.add(new Rule(extensions, ruleObj.getString("destination")));
+                String actionType = ruleObj.has("actionType") ? ruleObj.getString("actionType") : null;
+                String actionValue = ruleObj.has("actionValue") ? ruleObj.getString("actionValue") : null;
+
+                rules.add(new Rule(
+                    extensions,
+                    ruleObj.getString("destination"),
+                    actionType,
+                    actionValue
+                ));
             }
         }
 

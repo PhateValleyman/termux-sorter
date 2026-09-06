@@ -1,25 +1,27 @@
 {
  "rules":[
   {
-   "name":"Minecraft",
-   "extensions":[
-    "mcworld",
-    "mcaddon",
-    "mcpack"
-   ],
+   "extensions":["mcworld", "mcaddon", "mcpack"],
    "destination":"Minecraft",
    "actionType":"APP",
    "actionValue":"com.mojang.minecraftpe"
   },
 
   {
-   "name":"Scripts",
-   "extensions":[
-    "sh"
-   ],
+   "extensions":["sh"],
    "destination":"scripts",
    "actionType":"TERMUX_RUN",
    "actionValue":"/data/data/com.termux/files/home/bin/editor.sh"
+  },
+
+  {
+   "extensions":["apk", "apks", "xapk", "apkm"],
+   "destination":"APKS"
+  },
+
+  {
+   "extensions":["zip", "rar", "7z", "tar.gz", "gz", "xz", "bz2"],
+   "destination":"archives"
   }
  ],
 

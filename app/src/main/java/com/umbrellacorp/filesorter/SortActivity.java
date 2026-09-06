@@ -29,15 +29,36 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Handles "Otevřít v... → File Sorter" (ACTION_SEND / ACTION_SEND_MULTIPLE / ACTION_VIEW).
+ * Handles "Otevřít v... → Termux Sorter" (ACTION_SEND / ACTION_SEND_MULTIPLE / ACTION_VIEW).
  *
- * Sorts each incoming file into Downloads/<destination>/<filename> based on
- * the rules from {@link Config}, matched by file extension.
+ * For each incoming file:
+ *  1. Sorts it into Downloads/<destination>/<filename> based on the rules
+ *     from {@link Config}, matched by file extension.
+ *  2. Runs the matched rule's action:
+ *       - no actionType  -> opens a new Termux session cd'd into the destination
+ *       - "APP"/"TERMUX_RUN" -> delegated to {@link ActionRunner}
+ *     (only for the last processed file, to avoid opening several
+ *     Termux sessions / apps when sharing multiple files at once)
  */
 public class SortActivity extends Activity {
 
     private static final String TAG = "FileSorterActivity";
+
     private static final int REQUEST_WRITE_STORAGE = 1001;
+    private static final int REQUEST_RUN_COMMAND = 1002;
+
+    private static final String TERMUX_PACKAGE = "com.termux";
+    private static final String TERMUX_RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService";
+    private static final String TERMUX_RUN_COMMAND_ACTION = "com.termux.RUN_COMMAND";
+    private static final String TERMUX_RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND";
+    private static final String TERMUX_BASH = "/data/data/com.termux/files/usr/bin/bash";
+
+    // Stav poslední úspěšně zpracované položky - použije se po případném
+    // schválení RUN_COMMAND oprávnění.
+    private Config.Rule pendingRule;
+    private String pendingAbsolutePath;
+    private int pendingOk;
+    private int pendingFailed;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,18 +80,24 @@ public class SortActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == REQUEST_WRITE_STORAGE) {
-            boolean granted = grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        boolean granted = grantResults.length > 0
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED;
 
+        if (requestCode == REQUEST_WRITE_STORAGE) {
             if (granted) {
                 processIntent();
             } else {
-                Toast.makeText(this,
-                    "Bez oprávnění nelze soubory přesunout",
-                    Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Bez oprávnění nelze soubory přesunout", Toast.LENGTH_LONG).show();
                 finish();
             }
+
+        } else if (requestCode == REQUEST_RUN_COMMAND) {
+            if (granted) {
+                runPendingAction();
+            } else {
+                showSummaryToast();
+            }
+            finish();
         }
     }
 
@@ -80,6 +107,11 @@ public class SortActivity extends Activity {
 
     private boolean hasLegacyStoragePermission() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasRunCommandPermission() {
+        return ContextCompat.checkSelfPermission(this, TERMUX_RUN_COMMAND_PERMISSION)
             == PackageManager.PERMISSION_GRANTED;
     }
 
@@ -94,39 +126,102 @@ public class SortActivity extends Activity {
 
         Config.RuleSet ruleSet = Config.load(this);
 
-        int ok = 0;
-        int failed = 0;
-        String lastDestination = null;
+        pendingOk = 0;
+        pendingFailed = 0;
+        pendingRule = null;
+        pendingAbsolutePath = null;
 
         for (Uri uri : uris) {
-            SortResult result = sortSingleFile(uri, ruleSet);
-            if (result != null) {
-                ok++;
-                lastDestination = result.destinationFolder;
+            SortOutcome outcome = sortSingleFile(uri, ruleSet);
+            if (outcome != null) {
+                pendingOk++;
+                pendingRule = outcome.matchedRule;
+                pendingAbsolutePath = outcome.absolutePath;
             } else {
-                failed++;
+                pendingFailed++;
             }
         }
 
-        String message;
-        if (ok > 0 && failed == 0) {
-            message = ok == 1
-                ? "Přesunuto do Download/" + lastDestination
-                : "Přesunuto " + ok + " souborů";
-        } else if (ok > 0) {
-            message = "Přesunuto " + ok + ", selhalo " + failed;
-        } else {
-            message = "Přesun selhal";
+        if (pendingOk == 0) {
+            Toast.makeText(this, "Přesun selhal", Toast.LENGTH_LONG).show();
+            finish();
+            return;
         }
 
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        // Akce (otevření Termuxu / spuštění appky/skriptu) se řeší jen pro
+        // poslední úspěšně zpracovaný soubor.
+        boolean needsRunCommand = pendingRule == null
+            || pendingRule.actionType == null
+            || "TERMUX_RUN".equals(pendingRule.actionType);
+
+        if (needsRunCommand && !hasRunCommandPermission()) {
+            ActivityCompat.requestPermissions(
+                this,
+                new String[]{TERMUX_RUN_COMMAND_PERMISSION},
+                REQUEST_RUN_COMMAND
+            );
+            return; // pokračuje se v onRequestPermissionsResult
+        }
+
+        runPendingAction();
         finish();
     }
 
-    private static class SortResult {
-        final String destinationFolder;
-        SortResult(String destinationFolder) {
-            this.destinationFolder = destinationFolder;
+    private void runPendingAction() {
+        if (pendingRule != null && pendingRule.actionType != null) {
+            // Pravidlo má vlastní akci (APP / TERMUX_RUN / NONE).
+            ActionRunner.run(this, pendingRule, pendingAbsolutePath);
+            if (pendingFailed > 0) showSummaryToast();
+        } else {
+            // Výchozí chování: otevřít Termux přímo ve složce, kam se soubor uložil.
+            String folder = new File(pendingAbsolutePath).getParent();
+            openTermuxAt(folder != null ? folder : pendingAbsolutePath);
+        }
+    }
+
+    private void showSummaryToast() {
+        String message = (pendingFailed > 0)
+            ? "Přesunuto " + pendingOk + ", selhalo " + pendingFailed
+            : "Přesunuto do " + pendingAbsolutePath;
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    /**
+     * Otevře nový Termux session s pracovním adresářem nastaveným na absolutePath.
+     * Vyžaduje, aby měl Termux v ~/.termux/termux.properties nastaveno
+     * "allow-external-apps = true" - jinak Termux požadavek tiše odmítne.
+     */
+    private void openTermuxAt(String absolutePath) {
+        try {
+            Intent intent = new Intent();
+            intent.setClassName(TERMUX_PACKAGE, TERMUX_RUN_COMMAND_SERVICE);
+            intent.setAction(TERMUX_RUN_COMMAND_ACTION);
+            intent.putExtra("com.termux.RUN_COMMAND_PATH", TERMUX_BASH);
+            intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{});
+            intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", absolutePath);
+            intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", false);
+            // "0" = otevřít novou session a rovnou na ni přepnout do popředí.
+            intent.putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0");
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+
+        } catch (Exception e) {
+            Log.w(TAG, "Nelze otevřít Termux (není nainstalovaný / RUN_COMMAND zakázán?)", e);
+            Toast.makeText(this, "Přesunuto do " + absolutePath, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private static class SortOutcome {
+        final Config.Rule matchedRule; // null = shodovalo se jen výchozí pravidlo
+        final String absolutePath;
+
+        SortOutcome(Config.Rule matchedRule, String absolutePath) {
+            this.matchedRule = matchedRule;
+            this.absolutePath = absolutePath;
         }
     }
 
@@ -152,15 +247,17 @@ public class SortActivity extends Activity {
         return uris;
     }
 
-    private SortResult sortSingleFile(Uri sourceUri, Config.RuleSet ruleSet) {
+    private SortOutcome sortSingleFile(Uri sourceUri, Config.RuleSet ruleSet) {
         try {
             String fileName = resolveFileName(sourceUri);
             String extension = extractExtension(fileName, sourceUri);
-            String destinationFolder = matchDestination(extension, ruleSet);
+            Config.Rule matchedRule = matchRule(extension, ruleSet);
+            String destinationFolder = (matchedRule != null) ? matchedRule.destination : ruleSet.defaultDestination;
 
-            copyToDownloads(sourceUri, destinationFolder, fileName);
+            String finalFileName = copyToDownloads(sourceUri, destinationFolder, fileName);
+            String absolutePath = new File(downloadsDir(destinationFolder), finalFileName).getAbsolutePath();
 
-            return new SortResult(destinationFolder);
+            return new SortOutcome(matchedRule, absolutePath);
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to sort " + sourceUri, e);
@@ -198,7 +295,6 @@ public class SortActivity extends Activity {
             return fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
         }
 
-        // Fallback: derive from MIME type reported by the source app.
         String mime = getContentResolver().getType(uri);
         if (mime != null) {
             String fromMime = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime);
@@ -208,18 +304,26 @@ public class SortActivity extends Activity {
         return "";
     }
 
-    private String matchDestination(String extension, Config.RuleSet ruleSet) {
+    /** @return the matched rule, or null if only the default destination applies */
+    private Config.Rule matchRule(String extension, Config.RuleSet ruleSet) {
         for (Config.Rule rule : ruleSet.rules) {
             for (String ruleExt : rule.extensions) {
                 if (ruleExt.trim().toLowerCase(Locale.ROOT).equals(extension)) {
-                    return rule.destination;
+                    return rule;
                 }
             }
         }
-        return ruleSet.defaultDestination;
+        return null;
     }
 
-    private void copyToDownloads(Uri sourceUri, String destinationFolder, String fileName)
+    private File downloadsDir(String destinationFolder) {
+        File downloadsDir = Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_DOWNLOADS);
+        return new File(downloadsDir, destinationFolder);
+    }
+
+    /** @return the actual file name used (may differ from requested on collision) */
+    private String copyToDownloads(Uri sourceUri, String destinationFolder, String fileName)
             throws IOException {
 
         ContentResolver resolver = getContentResolver();
@@ -228,14 +332,14 @@ public class SortActivity extends Activity {
             if (input == null) throw new IOException("Cannot open input stream for " + sourceUri);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                copyViaMediaStore(input, destinationFolder, fileName);
+                return copyViaMediaStore(input, destinationFolder, fileName);
             } else {
-                copyViaLegacyFile(input, destinationFolder, fileName);
+                return copyViaLegacyFile(input, destinationFolder, fileName);
             }
         }
     }
 
-    private void copyViaMediaStore(InputStream input, String destinationFolder, String fileName)
+    private String copyViaMediaStore(InputStream input, String destinationFolder, String fileName)
             throws IOException {
 
         ContentValues values = new ContentValues();
@@ -254,24 +358,49 @@ public class SortActivity extends Activity {
             if (output == null) throw new IOException("Cannot open output stream for " + targetUri);
             streamCopy(input, output);
         }
+
+        // MediaStore si samo přejmenuje soubor při kolizi (přidá " (1)" apod.),
+        // ale finální jméno raději ověříme přes DISPLAY_NAME, ať path sedí.
+        try (Cursor c = getContentResolver().query(
+                targetUri, new String[]{MediaStore.Downloads.DISPLAY_NAME}, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                return c.getString(0);
+            }
+        }
+        return fileName;
     }
 
-    private void copyViaLegacyFile(InputStream input, String destinationFolder, String fileName)
+    private String copyViaLegacyFile(InputStream input, String destinationFolder, String fileName)
             throws IOException {
 
-        File downloadsDir = Environment.getExternalStoragePublicDirectory(
-            Environment.DIRECTORY_DOWNLOADS);
-        File targetDir = new File(downloadsDir, destinationFolder);
+        File targetDir = downloadsDir(destinationFolder);
 
         if (!targetDir.exists() && !targetDir.mkdirs()) {
             throw new IOException("Cannot create directory " + targetDir);
         }
 
-        File targetFile = new File(targetDir, fileName);
+        // Ochrana proti přepsání existujícího souboru se stejným jménem.
+        String finalName = fileName;
+        File targetFile = new File(targetDir, finalName);
+        int suffix = 1;
+        String baseName = fileName;
+        String ext = "";
+        int dot = fileName.lastIndexOf('.');
+        if (dot > 0) {
+            baseName = fileName.substring(0, dot);
+            ext = fileName.substring(dot);
+        }
+        while (targetFile.exists()) {
+            finalName = baseName + "_" + suffix + ext;
+            targetFile = new File(targetDir, finalName);
+            suffix++;
+        }
 
         try (OutputStream output = new FileOutputStream(targetFile)) {
             streamCopy(input, output);
         }
+
+        return finalName;
     }
 
     private void streamCopy(InputStream input, OutputStream output) throws IOException {
