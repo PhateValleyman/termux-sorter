@@ -1,1 +1,4 @@
 keystore.properties
+build
+app/build
+.gradle
