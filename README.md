@@ -110,11 +110,15 @@ Přidávání pravidel
 Mazání pravidel
 
 
-v0.3
+v0.3 ✅
 
 ACTION_SEND receiver
 
 Přímé třídění přes Android intent
+
+Poznámka: na Androidu 6.0–8.1 (API 23–28) aplikace při prvním použití
+požádá o oprávnění k zápisu do úložiště (na novějších verzích to díky
+MediaStore není potřeba).
 
 
 v0.4

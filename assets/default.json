@@ -1,20 +1,16 @@
 {
   "rules": [
     {
-      "extensions": [
-        "mcworld",
-        "mcaddon",
-        "mcpack"
-      ],
+      "extensions": ["mcworld", "mcaddon", "mcpack"],
       "destination": "Minecraft"
     },
     {
-      "extensions": [
-        "apk",
-        "apks",
-        "xapk"
-      ],
+      "extensions": ["apk", "apks", "xapk", "apkm"],
       "destination": "APKS"
+    },
+    {
+      "extensions": ["zip", "rar", "7z", "tar.gz", "gz", "xz", "bz2"],
+      "destination": "archives"
     }
   ],
   "default": "Other"

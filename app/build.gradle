@@ -1,9 +1,18 @@
 plugins {
     id 'com.android.application'
 }
+
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasKeystore = keystorePropertiesFile.exists()
+if (hasKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "com.umbrellacorp.termuxsorter"
     compileSdk 34
+
     defaultConfig {
         applicationId "com.umbrellacorp.termuxsorter"
         minSdk 23
@@ -11,10 +20,28 @@ android {
         versionCode 1
         versionName "1.0"
     }
+
+    signingConfigs {
+        if (hasKeystore) {
+            release {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            // Bez keystore.properties se podepíše debug klíčem, aby build
+            // nespadl (viz README pro nastavení opravdového release klíče).
+            signingConfig hasKeystore ? signingConfigs.release : signingConfigs.debug
             minifyEnabled false
         }
     }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
 }
