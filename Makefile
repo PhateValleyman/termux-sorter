@@ -1,4 +1,4 @@
-.PHONY: all help clean debug release redmi tablet apk install env
+.PHONY: all help clean debug release redmi tablet apk install env open
 
 # Terminal colors
 GREEN := \033[0;32m
@@ -11,6 +11,7 @@ APP_NAME := termux-sorter
 GRADLE := ./gradlew
 ADB ?= adb
 BUILD_DIR := app/build/outputs/apk
+APK := $(BUILD_DIR)/debug/app-debug.apk
 
 # Android environment defaults for Termux
 ANDROID_SDK_ROOT ?= $(ANDROID_HOME)
@@ -28,6 +29,7 @@ help:
 	@echo "  $(YELLOW)make release$(RESET)    Build release APK"
 	@echo "  $(YELLOW)make redmi$(RESET)      Build Redmi profile (Android 14 / API 34)"
 	@echo "  $(YELLOW)make tablet$(RESET)     Build Shield Tablet profile (Android 8.1 / API 27)"
+	@echo "  $(YELLOW)make open$(RESET)       Open APK with Android package installer"
 	@echo "  $(YELLOW)make clean$(RESET)      Remove build files"
 	@echo "  $(YELLOW)make install$(RESET)    Install debug APK via adb"
 	@echo "  $(YELLOW)make apk$(RESET)        List generated APK files"
@@ -41,11 +43,6 @@ help:
 	@echo "  TARGET_ARCH        = $${TARGET_ARCH:-$$(uname -m)}"
 	@echo "  JAVA_HOME          = $${JAVA_HOME:-not set}"
 	@echo "  Gradle             = $(GRADLE)"
-	@echo ""
-	@echo "$(GREEN)Recommended Termux variables:$(RESET)"
-	@echo "  export ANDROID_SDK_ROOT=\$$HOME/lib/android-sdk"
-	@echo "  export ANDROID_NDK_HOME=\$$ANDROID_SDK_ROOT/ndk/<version>"
-	@echo "  export PATH=\$$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:\$$PATH"
 	@echo ""
 
 # Print only build environment
@@ -75,6 +72,17 @@ tablet:
 	@echo "$(GREEN)Building for Android 8.1 tablet...$(RESET)"
 	ANDROID_API_LEVEL=27 $(GRADLE) assembleRelease
 
+# Open APK using Android package installer
+open:
+	@echo "$(GREEN)Opening APK in Android system...$(RESET)"
+	@if [ -f "$(APK)" ]; then \
+		am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d file://$(PWD)/$(APK); \
+	else \
+		echo "$(RED)APK not found: $(APK)$(RESET)"; \
+		echo "Run 'make debug' first"; \
+		exit 1; \
+	fi
+
 # Remove generated build output
 clean:
 	@echo "$(YELLOW)Cleaning build files...$(RESET)"
@@ -83,7 +91,7 @@ clean:
 # Install debug APK using adb
 install: debug
 	@echo "$(GREEN)Installing APK...$(RESET)"
-	$(ADB) install -r $(BUILD_DIR)/debug/app-debug.apk
+	$(ADB) install -r $(APK)
 
 # Show generated APK files
 apk:
